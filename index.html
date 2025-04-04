@@ -1,0 +1,228 @@
+
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <title>Zlatý Klikač – Výkonový prehľad</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #fef9f3;
+      color: #333;
+      text-align: center;
+      padding: 40px;
+    }
+    table {
+      margin: 0 auto;
+      border-collapse: collapse;
+    }
+    td, th {
+      border: 1px solid #ccc;
+      padding: 10px;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+    }
+    .done {
+      background-color: #a3e635; /* zelená */
+    }
+    .missed {
+      background-color: #f87171; /* červená */
+    }
+  </style>
+</head>
+<body>
+
+<h1>📅 Kalendár splnených cieľov</h1>
+
+<div class="month-nav">
+  <button onclick="changeMonth(-1)">⬅️</button>
+  <span id="monthLabel" style="font-weight: bold; margin: 0 10px;"></span>
+  <button onclick="changeMonth(1)">➡️</button>
+</div>
+
+<div id="calendar" style="margin-top: 20px;"></div>
+
+<div class="stats" style="margin-top: 30px;">
+  <h2>📊 Štatistiky</h2>
+  <p>📅 Splnené dni: <span id="doneDays">0</span></p>
+  <p>💰 Celkový zisk: <span id="totalProfit">$0</span> / $10 000</p>
+  <p>🎯 Chýba do cieľa: <span id="remaining">$10 000</span></p>
+</div>
+
+
+<div id="performanceGraph" style="margin-top: 40px;"></div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+
+const today = new Date();
+let viewedYear = today.getFullYear();
+let viewedMonth = today.getMonth();
+
+
+
+function updateCalendar() {
+  document.getElementById("monthLabel").textContent = new Date(viewedYear, viewedMonth).toLocaleDateString("sk-SK", {
+    year: "numeric", month: "long"
+  });
+
+  const log = JSON.parse(localStorage.getItem("goldClickerLog")) || [];
+  const container = document.getElementById("calendar");
+  container.innerHTML = "";
+  const table = document.createElement("table");
+  container.appendChild(table);
+
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  let header = document.createElement("tr");
+  ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"].forEach(day => {
+    let th = document.createElement("th");
+    th.textContent = day;
+    header.appendChild(th);
+  });
+  table.appendChild(header);
+
+  let row = document.createElement("tr");
+  let date = new Date(year, month, 1);
+  let dayOfWeek = (date.getDay() + 6) % 7;
+  for (let i = 0; i < dayOfWeek; i++) {
+    row.appendChild(document.createElement("td"));
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    let currentDate = new Date(year, month, d);
+    let day = currentDate.getDay();
+    let cell = document.createElement("td");
+    let dateStr = currentDate.toISOString().split("T")[0];
+    cell.textContent = d;
+
+    if (log.includes(dateStr)) {
+      cell.classList.add("done");
+    } else if (currentDate < today) {
+      cell.classList.add("missed");
+    }
+
+    cell.onclick = () => toggleDay(dateStr);
+    row.appendChild(cell);
+
+    if (row.children.length === 7) {
+      table.appendChild(row);
+      row = document.createElement("tr");
+    }
+  }
+
+  if (row.children.length > 0) {
+    table.appendChild(row);
+  }
+
+  renderGraph(log, year, month);
+}
+
+
+function toggleDay(dateStr) {
+  let log = JSON.parse(localStorage.getItem("goldClickerLog")) || [];
+  const index = log.indexOf(dateStr);
+  if (index === -1) {
+    log.push(dateStr);
+  } else {
+    log.splice(index, 1);
+  }
+  localStorage.setItem("goldClickerLog", JSON.stringify(log));
+
+  // Refresh uložených údajov a štatistiky
+  updateCalendar();
+  const updatedLog = JSON.parse(localStorage.getItem("goldClickerLog")) || [];
+  updateStats(updatedLog, viewedYear, viewedMonth);
+
+  let log = JSON.parse(localStorage.getItem("goldClickerLog")) || [];
+  const index = log.indexOf(dateStr);
+  if (index === -1) {
+    log.push(dateStr);
+  } else {
+    log.splice(index, 1);
+  }
+  localStorage.setItem("goldClickerLog", JSON.stringify(log));
+  updateCalendar();
+  const filteredLog = JSON.parse(localStorage.getItem("goldClickerLog")) || [];
+  updateStats(filteredLog, viewedYear, viewedMonth);
+}
+
+function renderGraph(log, year, month) {
+  const canvasContainer = document.getElementById("performanceGraph");
+  canvasContainer.innerHTML = "<canvas id='graphCanvas' width='600' height='200'></canvas>";
+  const ctx = document.getElementById('graphCanvas').getContext('2d');
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const labels = [];
+  const data = [];
+
+  for (let i = 1; i <= daysInMonth; i++) {
+    let date = new Date(year, month, i);
+    if (date.getDay() === 6 || date.getDay() === 0) continue;
+    let dateStr = date.toISOString().split("T")[0];
+    labels.push(i.toString());
+    data.push(log.includes(dateStr) ? 1 : 0);
+  }
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Splnené dni',
+        data: data,
+        backgroundColor: data.map(v => v ? '#4caf50' : '#e53935')
+      }]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 1,
+          ticks: { stepSize: 1 }
+        }
+      }
+    }
+  });
+}
+
+
+function changeMonth(delta) {
+  viewedMonth += delta;
+  if (viewedMonth < 0) {
+    viewedMonth = 11;
+    viewedYear--;
+  } else if (viewedMonth > 11) {
+    viewedMonth = 0;
+    viewedYear++;
+  }
+  updateCalendar();
+  const filteredLog = JSON.parse(localStorage.getItem("goldClickerLog")) || [];
+  updateStats(filteredLog, viewedYear, viewedMonth);
+}
+
+function updateStats(log, year, month) {
+  const thisMonth = log.filter(dateStr => {
+    const parts = dateStr.split("-");
+    const logYear = parseInt(parts[0]);
+    const logMonth = parseInt(parts[1]) - 1;
+    return logYear === year && logMonth === month;
+  });
+  const days = thisMonth.length;
+  const earned = days * 800;
+  const remaining = 10000 - earned;
+
+  document.getElementById("doneDays").textContent = days;
+  document.getElementById("totalProfit").textContent = "$" + earned.toLocaleString();
+  document.getElementById("remaining").textContent = "$" + (remaining > 0 ? remaining.toLocaleString() : "0 ✅");
+}
+
+window.onload = updateCalendar;
+
+</script>
+
+</body>
+</html>
