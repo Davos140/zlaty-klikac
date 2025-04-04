@@ -1,0 +1,120 @@
+
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <title>Zlatý Klikač – Jednoduchý režim</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #fffaf4;
+      color: #222;
+      text-align: center;
+      padding: 40px;
+    }
+    table {
+      margin: 20px auto;
+      border-collapse: collapse;
+    }
+    td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .done { background-color: #86efac; }
+    .missed { background-color: #fca5a5; }
+  </style>
+</head>
+<body>
+
+<h1>📅 XAUUSD mesačný cieľ</h1>
+
+<div id="calendar"></div>
+
+<div class="stats" style="margin-top: 30px;">
+  <h2>📊 Štatistiky</h2>
+  <p>✅ Splnené dni: <span id="doneDays">0</span></p>
+  <p>💰 Celkový zisk: <span id="totalProfit">$0</span> / $10 000</p>
+  <p>🎯 Chýba do cieľa: <span id="remaining">$10 000</span></p>
+</div>
+
+<script>
+const today = new Date();
+const year = today.getFullYear();
+const month = today.getMonth();
+const daysInMonth = 31;
+
+function updateCalendar() {
+  const log = JSON.parse(localStorage.getItem("goldClickerLog")) || [];
+  const table = document.createElement("table");
+  let row = document.createElement("tr");
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    let currentDate = new Date(year, month, d);
+    let cell = document.createElement("td");
+    let dateStr = currentDate.toISOString().split("T")[0];
+    cell.textContent = d;
+
+    if (log.includes(dateStr)) {
+      cell.classList.add("done");
+    } else if (currentDate < today) {
+      cell.classList.add("missed");
+    }
+
+    cell.onclick = () => toggleDay(dateStr);
+    row.appendChild(cell);
+
+    if (row.children.length === 7) {
+      table.appendChild(row);
+      row = document.createElement("tr");
+    }
+  }
+
+  if (row.children.length > 0) {
+    table.appendChild(row);
+  }
+
+  const container = document.getElementById("calendar");
+  container.innerHTML = "";
+  container.appendChild(table);
+
+  updateStats(log);
+}
+
+function toggleDay(dateStr) {
+  let log = JSON.parse(localStorage.getItem("goldClickerLog")) || [];
+  const index = log.indexOf(dateStr);
+  if (index === -1) {
+    log.push(dateStr);
+  } else {
+    log.splice(index, 1);
+  }
+  localStorage.setItem("goldClickerLog", JSON.stringify(log));
+  updateCalendar();
+}
+
+function updateStats(log) {
+  const relevant = log.filter(dateStr => {
+    const parts = dateStr.split("-");
+    const logYear = parseInt(parts[0]);
+    const logMonth = parseInt(parts[1]) - 1;
+    return logYear === year && logMonth === month;
+  });
+  const days = relevant.length;
+  const earned = days * 800;
+  const remaining = Math.max(0, 10000 - earned);
+
+  document.getElementById("doneDays").textContent = days;
+  document.getElementById("totalProfit").textContent = "$" + earned.toLocaleString();
+  document.getElementById("remaining").textContent = "$" + remaining.toLocaleString();
+}
+
+window.onload = updateCalendar;
+</script>
+
+</body>
+</html>
